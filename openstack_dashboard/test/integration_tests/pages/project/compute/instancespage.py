@@ -12,6 +12,24 @@
 from openstack_dashboard.test.integration_tests.pages import basepage
 from openstack_dashboard.test.integration_tests.regions import forms
 from openstack_dashboard.test.integration_tests.regions import tables
+from openstack_dashboard.test.integration_tests.regions import menus
+
+
+class InstanceForm(forms.VerticalTabbedFormRegion):
+    CREATE_INSTANCE_FORM_FIELDS = (({"name": "name",
+                                    "availability-zone": "availability-zone",
+                                     "count": "count"}),
+                                   ({"boot-source-type": "boot-source-type", "image": "image",
+                                    "snapshot": "snapshot", "volume": "volume",
+                                     "volume-snapshot": "volume_snapshot",
+                                     "vol-create": "vol_create",
+                                     'boot_sources': menus.TransferTableMenuRegion}),
+                                   ({'flavors': menus.TransferTableMenuRegion}),
+                                   ({'networks': menus.TransferTableMenuRegion}))
+
+    def __init__(self, driver, conf, tab=0):
+        super(InstanceForm, self).__init__\
+            (driver, conf, field_mappings=self.CREATE_INSTANCE_FORM_FIELDS)
 
 
 class InstancesTable(tables.TableRegion):
@@ -32,6 +50,12 @@ class InstancesTable(tables.TableRegion):
         return forms.TabbedFormRegion(
             self.driver, self.conf,
             field_mappings=self.CREATE_INSTANCE_FORM_FIELDS)
+
+    @tables.bind_table_action('launch-ng')
+    def launch_instancenew(self, launch_button):
+        launch_button.click()
+        return InstanceForm(
+            self.driver, self.conf)
 
     @tables.bind_table_action('delete')
     def delete_instance(self, delete_button):
@@ -54,6 +78,18 @@ class InstancesPage(basepage.BaseNavigationPage):
     INSTANCES_TABLE_STATUS_COLUMN = 'status'
     INSTANCES_TABLE_IP_COLUMN = 'ip'
     INSTANCES_TABLE_IMAGE_NAME_COLUMN = 'image_name'
+
+    NEW_DEFAULT_AZ = 'nova'
+    NEW_DEFAULT_COUNT = 1
+    NEW_DEFAULT_BOOT_SOURCE = 'image'
+    NEW_DEFAULT_VOLUME_NAME = None
+    NEW_DEFAULT_SNAPSHOT_NAME = None
+    NEW_DEFAULT_VOLUME_SNAPSHOT_NAME = None
+    NEW_DEFAULT_VOLUME_CREATION = 'No'
+    NEW_DEFAULT_BOOT_SOURCE_NAME = 'cirros-0.3.4-x86_64-uec'
+    NEW_DEFAULT_NETWORK = 'public'
+    NEW_DEFAULT_FLAVOR = 'm1.tiny'
+
 
     def __init__(self, driver, conf):
         super(InstancesPage, self).__init__(driver, conf)
@@ -98,6 +134,25 @@ class InstancesPage(basepage.BaseNavigationPage):
         if vol_delete_on_instance_delete:
             instance_form.vol_delete_on_instance_delete.mark()
         instance_form.submit()
+
+    def launch_instance(self, name, availability_zone=NEW_DEFAULT_AZ,
+                        instance_count=NEW_DEFAULT_COUNT,
+                        boot_source_type=NEW_DEFAULT_BOOT_SOURCE,
+                        image_name=NEW_DEFAULT_BOOT_SOURCE_NAME,
+                        create_volume=NEW_DEFAULT_VOLUME_CREATION,
+                        flavor_size=DEFAULT_FLAVOR,
+                        network=NEW_DEFAULT_NETWORK):
+
+        launch_instance_form = self.instances_table.launch_instancenew()
+        launch_instance_form.name.text = name
+        launch_instance_form.availability_zone.text = availability_zone
+        launch_instance_form.instance_count.text = instance_count
+        launch_instance_form.boot_source_type = boot_source_type
+        launch_instance_form.create_volume.text = create_volume
+        launch_instance_form.boot_sources.allocate_boot_source(name=image_name)
+        launch_instance_form.flavors.allocate_flavor(name=flavor_size)
+        launch_instance_form.networks.allocate_network(name=network)
+        launch_instance_form.submit()
 
     def delete_instance(self, name):
         row = self._get_row_with_instance_name(name)

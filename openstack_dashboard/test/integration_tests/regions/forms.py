@@ -34,6 +34,7 @@ class FieldFactory(baseregion.BaseRegion):
             locator = (by.By.CSS_SELECTOR,
                        '%s %s' % (self._element_locator_str_prefix,
                                   field_cls._element_locator_str_suffix))
+
             elements = super(FieldFactory, self)._get_elements(*locator)
             for element in elements:
                 yield field_cls(self.driver, self.conf, element)
@@ -120,13 +121,13 @@ class ProjectPageCheckBoxFormFieldRegion(CheckBoxMixin, BaseFormFieldRegion):
     """Checkbox field for Project-page."""
 
     _element_locator_str_suffix = \
-        'div > .themable-checkbox input[type=checkbox] + label'
+        '.themable-checkbox input[type=checkbox] + label'
 
 
 class ChooseFileFormFieldRegion(BaseFormFieldRegion):
     """Choose file field."""
 
-    _element_locator_str_suffix = 'div > input[type=file]'
+    _element_locator_str_suffix = 'input[type=file]'
 
     def choose(self, path):
         self.element.send_keys(path)
@@ -149,31 +150,31 @@ class TextInputFormFieldRegion(BaseTextFormFieldRegion):
     """Text input box."""
 
     _element_locator_str_suffix = \
-        'div > input[type=text], div > input[type=None]'
+        'input[type=text], input[type=None]'
 
 
 class PasswordInputFormFieldRegion(BaseTextFormFieldRegion):
     """Password text input box."""
 
-    _element_locator_str_suffix = 'div > input[type=password]'
+    _element_locator_str_suffix = 'input[type=password]'
 
 
 class EmailInputFormFieldRegion(BaseTextFormFieldRegion):
     """Email text input box."""
 
-    _element_locator_str_suffix = 'div > input[type=email]'
+    _element_locator_str_suffix = 'input[type=email]'
 
 
 class TextAreaFormFieldRegion(BaseTextFormFieldRegion):
     """Multi-line text input box."""
 
-    _element_locator_str_suffix = 'div > textarea'
+    _element_locator_str_suffix = 'textarea'
 
 
 class IntegerFormFieldRegion(BaseFormFieldRegion):
     """Integer input box."""
 
-    _element_locator_str_suffix = 'div > input[type=number]'
+    _element_locator_str_suffix = 'input[type=number]'
 
     @property
     def value(self):
@@ -187,7 +188,7 @@ class IntegerFormFieldRegion(BaseFormFieldRegion):
 class SelectFormFieldRegion(BaseFormFieldRegion):
     """Select box field."""
 
-    _element_locator_str_suffix = 'div > select'
+    _element_locator_str_suffix = 'select'
 
     def is_displayed(self):
         return self.element._el.is_displayed()
@@ -205,7 +206,8 @@ class SelectFormFieldRegion(BaseFormFieldRegion):
 
     @property
     def name(self):
-        return self.element._el.get_attribute('name')
+        name = self.element._el.get_attribute('name')
+        return name or self.element._el.get_attribute('id')
 
     @property
     def text(self):
@@ -222,6 +224,11 @@ class SelectFormFieldRegion(BaseFormFieldRegion):
     @value.setter
     def value(self, value):
         self.element.select_by_value(value)
+
+
+class TransferTableRegion(baseregion.BaseRegion):
+    """Class that represents ng-table."""
+    _transfer_table_locator_str_prefix = 'div.transfer-table'
 
 
 class BaseFormRegion(baseregion.BaseRegion):
@@ -391,6 +398,56 @@ class TabbedFormRegion(FormRegion):
         return menus.TabbedMenuRegion(self.driver, self.conf,
                                       src_elem=self.src_elem)
 
+
+class VerticalTabbedFormRegion(TabbedFormRegion):
+    """Forms that are divided with vertical tabs.
+       These forms are implemented in angular-js and
+       have transfer-tables as usual field's element.
+    """
+
+    _submit_locator = (by.By.CSS_SELECTOR, '*.btn.btn-primary[type=finish]')
+    _header_locator = (by.By.CSS_SELECTOR, 'div.modal-header > h4')
+    _fields_locator = (by.By.CSS_SELECTOR, 'div.step.ng-scope')
+
+    def __init__(self, driver, conf, field_mappings=None, default_tab=0):
+        self.current_tab = default_tab
+        super(VerticalTabbedFormRegion, self).__init__(
+            driver, conf, field_mappings=field_mappings)
+
+    def _init_form_fields(self):
+        self.switch_to(self.current_tab)
+
+    def _init_tab_fields(self, tab_index):
+        fieldsets = self._get_elements(*self._fields_locator)
+        self.fields_src_elem = fieldsets[tab_index]
+        fields = self._get_form_fields()
+        current_tab_mappings = self.field_mappings[tab_index]
+        for accessor_name, accessor_expr in current_tab_mappings.items():
+            if isinstance(accessor_expr, six.string_types):
+                self._dynamic_properties[accessor_name] = fields[accessor_expr]
+            else:  # it is a class
+                self._dynamic_properties[accessor_name] = accessor_expr(
+                    self.driver, self.conf)
+
+    def switch_to(self, tab_index=0):
+        self.tabs.switch_to(index=tab_index)
+        self._init_tab_fields(tab_index)
+
+    # properties
+
+    @property
+    def tabs(self):
+        return menus.VerticalTabbedMenuRegion(self.driver, self.conf)
+
+    @property
+    def header(self):
+        """Form header."""
+        return self._get_element(*self._header_locator)
+
+    @property
+    def fields(self):
+        """List of all fields that form contains."""
+        return self._get_form_fields()
 
 class DateFormRegion(BaseFormRegion):
     """Form that queries data to table that is regularly below the form,

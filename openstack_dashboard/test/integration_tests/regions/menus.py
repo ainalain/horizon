@@ -245,6 +245,14 @@ class TabbedMenuRegion(baseregion.BaseRegion):
         self._get_elements(*self._tab_locator)[index].click()
 
 
+class VerticalTabbedMenuRegion(baseregion.BaseRegion):
+
+    _tab_locator = (by.By.CSS_SELECTOR, 'li.nav-item')
+    _default_src_locator = (by.By.CSS_SELECTOR, '.wizard-nav')
+
+    def switch_to(self, index=0):
+        self._get_elements(*self._tab_locator)[index].click()
+
 class ProjectDropDownRegion(DropDownMenuRegion):
 
     _menu_first_child_locator = (by.By.CSS_SELECTOR, '*')
@@ -259,3 +267,59 @@ class ProjectDropDownRegion(DropDownMenuRegion):
         else:
             raise exceptions.NoSuchElementException(
                 "Not found element with text: %s" % name)
+
+
+
+class TransferTableMenuRegion(baseregion.BaseRegion):
+
+
+    """A decorator to bind transfer-table to an actual launch-instance
+    form. Returns name of the component that allows to create
+    dynamically relevant transfer-table fields.
+
+    .. param::
+
+    """
+
+    _allocated_locator = (by.By.CSS_SELECTOR,
+                          'div.transfer-allocated tbody tr.ng-scope')
+
+    _available_locator = (by.By.CSS_SELECTOR,
+                          'div.transfer-available tbody tr.ng-scope')
+
+    _add_remove_sublocator = (by.By.CSS_SELECTOR,
+                              'td.action-col button.btn')
+
+    _comp_name_sublocator = (by.By.CSS_SELECTOR,
+                             'td.rsp-p1 ng-binding')
+    if not _comp_name_sublocator:
+        _comp_name_sublocator = (by.By.CSS_SELECTOR,
+                                 'td.ng-binding hi-light')
+
+    def get_component_name(self, element):
+        return element.find_element(*self._comp_name_sublocator).\
+            text
+
+    @property
+    def get_available_components(self):
+        return {self.get_component_name(el):
+                    el for el in self._get_elements(*self._available_locator)}
+
+    @property
+    def get_allocated_components(self):
+        return {self.get_component_name(el):
+                    el for el in self._get_element(*self._allocated_locator)}
+
+    def allocate_component(self, name, available_components=None):
+        if available_components is None:
+            available_components = self.available_components
+
+        available_components[name].\
+            find_element(*self._add_remove_sublocator).click()
+
+    def deallocate_boot_source(self, name, allocated_components=None):
+        if allocated_components is None:
+            allocated_components = self.allocated_components
+
+        allocated_components[name].\
+            find_element(*self._add_remove_sublocator).click()
